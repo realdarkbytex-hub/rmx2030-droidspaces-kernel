@@ -102,16 +102,20 @@ jobs:
         run: |
           make ARCH=arm64 defconfig
 
+      - name: Install ARM64 GCC toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
       - name: Build kernel
         working-directory: kernel
         run: |
           make clean
           make -j$(nproc) \
             ARCH=arm64 \
-            LLVM=1 \
-            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
             HOSTCC=gcc \
-            HOSTCFLAGS=-fcommon
+            HOSTCFLAGS="-fcommon"
             
       - name: Upload kernel
         uses: actions/upload-artifact@v4
