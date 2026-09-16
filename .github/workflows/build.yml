@@ -1,0 +1,121 @@
+name: Build RMX2030 DroidSpaces Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Clone kernel source
+        run: |
+          git clone --depth=1 -b pie \
+            https://github.com/MayuriLabs/android_kernel_realme_rmx2030.git \
+            kernel
+
+      - name: Configure DroidSpaces
+        working-directory: kernel
+        run: |
+          DEFCONFIG=arch/arm64/configs/defconfig
+
+          set_config() {
+            CONFIG="$1"
+            VALUE="$2"
+
+            if grep -q "^${CONFIG}=" "$DEFCONFIG"; then
+              sed -i "s|^${CONFIG}=.*|${CONFIG}=${VALUE}|" "$DEFCONFIG"
+            elif grep -q "^# ${CONFIG} is not set" "$DEFCONFIG"; then
+              sed -i "s|^# ${CONFIG} is not set|${CONFIG}=${VALUE}|" "$DEFCONFIG"
+            else
+              echo "${CONFIG}=${VALUE}" >> "$DEFCONFIG"
+            fi
+          }
+
+          set_config CONFIG_SYSCTL y
+          set_config CONFIG_SYSVIPC y
+          set_config CONFIG_POSIX_MQUEUE y
+
+          set_config CONFIG_NAMESPACES y
+          set_config CONFIG_PID_NS y
+          set_config CONFIG_UTS_NS y
+          set_config CONFIG_IPC_NS y
+          set_config CONFIG_USER_NS y
+
+          set_config CONFIG_SECCOMP y
+          set_config CONFIG_SECCOMP_FILTER y
+
+          set_config CONFIG_CGROUPS y
+          set_config CONFIG_CGROUP_DEVICE y
+          set_config CONFIG_CGROUP_PIDS y
+          set_config CONFIG_MEMCG y
+          set_config CONFIG_CGROUP_SCHED y
+          set_config CONFIG_FAIR_GROUP_SCHED y
+          set_config CONFIG_CGROUP_FREEZER y
+          set_config CONFIG_CGROUP_NET_PRIO y
+
+          set_config CONFIG_DEVTMPFS y
+          set_config CONFIG_OVERLAY_FS y
+
+          set_config CONFIG_TMPFS_POSIX_ACL y
+          set_config CONFIG_TMPFS_XATTR y
+
+          set_config CONFIG_FW_LOADER y
+          set_config CONFIG_FW_LOADER_USER_HELPER y
+          set_config CONFIG_FW_LOADER_COMPRESS y
+
+          set_config CONFIG_NET_NS y
+          set_config CONFIG_VETH y
+          set_config CONFIG_BRIDGE y
+          set_config CONFIG_NETFILTER y
+          set_config CONFIG_BRIDGE_NETFILTER y
+          set_config CONFIG_NETFILTER_ADVANCED y
+          set_config CONFIG_NF_CONNTRACK y
+          set_config CONFIG_IP_NF_IPTABLES y
+          set_config CONFIG_IP_NF_FILTER y
+          set_config CONFIG_NF_NAT y
+          set_config CONFIG_NF_TABLES y
+          set_config CONFIG_IP_NF_TARGET_MASQUERADE y
+          set_config CONFIG_NETFILTER_XT_TARGET_MASQUERADE y
+          set_config CONFIG_NETFILTER_XT_TARGET_TCPMSS y
+          set_config CONFIG_NETFILTER_XT_MATCH_ADDRTYPE y
+          set_config CONFIG_NF_CONNTRACK_NETLINK y
+          set_config CONFIG_NF_NAT_REDIRECT y
+          set_config CONFIG_IP_ADVANCED_ROUTER y
+          set_config CONFIG_IP_MULTIPLE_TABLES y
+
+          set_config CONFIG_NF_CONNTRACK_IPV4 y
+          set_config CONFIG_NF_NAT_IPV4 y
+          set_config CONFIG_IP_NF_NAT y
+
+          set_config CONFIG_ANDROID_PARANOID_NETWORK n
+
+      - name: Show DroidSpaces configuration
+        working-directory: kernel
+        run: |
+          grep -E \
+          'CONFIG_(PID_NS|IPC_NS|UTS_NS|USER_NS|NET_NS|VETH|BRIDGE|CGROUP|DEVTMPFS|OVERLAY_FS|SECCOMP)' \
+          arch/arm64/configs/defconfig
+
+      - name: Prepare configuration
+        working-directory: kernel
+        run: |
+          make ARCH=arm64 defconfig
+
+      - name: Build kernel
+        working-directory: kernel
+        run: |
+          make -j$(nproc) \
+            ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CC=clang \
+            LLVM=1
+
+      - name: Upload kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: rmx2030-kernel
+          path: |
+            kernel/arch/arm64/boot/Image
+            kernel/arch/arm64/boot/Image.gz
+            kernel/arch/arm64/boot/Image.gz-dtb
